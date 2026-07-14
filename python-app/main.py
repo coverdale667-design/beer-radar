@@ -1,62 +1,102 @@
 import telebot
 from telebot import types
 import requests
+import math
 
 TOKEN = '8912910354:AAFwMBI5wEpdiuKt2Q4Bp-C8wgDgjvjFIWo'
 bot = telebot.TeleBot(TOKEN)
 
-# Функция для поиска дешевого пива на Е-доставке
+# Реальные пивные точки в Минске для теста поиска рядом
+BEER_PLACES = [
+    {
+        "name": "Дискаунтер 'Грошык' (дешевое баночное)",
+        "address": "ул. Козлова, 30",
+        "lat": 53.9068,
+        "lon": 27.5925,
+        "info": "Крыніца Светлае — 1.79 BYN"
+    },
+    {
+        "name": "Магазин 'Хит! Экспресс' (акции)",
+        "address": "ул. Ленина, 5",
+        "lat": 53.9009,
+        "lon": 27.5587,
+        "info": "Аливария 10-ка (0.9л) — 2.49 BYN"
+    },
+    {
+        "name": "Магазин разливного пива 'Точка'",
+        "address": "ул. Бельского, 10",
+        "lat": 53.9015,
+        "lon": 27.4811,
+        "info": "Аливария на розлив от 3.50 BYN/л"
+    },
+    {
+        "name": "Пивной магазин 'Бавария'",
+        "address": "пр. Дзержинского, 119",
+        "lat": 53.8492,
+        "lon": 27.4743,
+        "info": "Лидское от 3.80 BYN/л"
+    },
+    {
+        "name": "Бар-магазин крафта 'Spin Bar'",
+        "address": "ул. Кальварийская, 21",
+        "lat": 53.9056,
+        "lon": 27.5276,
+        "info": "Локальный крафт от 6.50 BYN"
+    }
+]
+
+# Формула Гаверсинуса для расчета расстояния в метрах между двумя точками GPS
+def calculate_distance(lat1, lon1, lat2, lon2):
+    R = 6371000  # Радиус Земли в метрах
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+
+    a = math.sin(delta_phi / 2) ** 2 + \
+        math.cos(phi1) * math.cos(phi2) * \
+        math.sin(delta_lambda / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    return R * c  # Возвращает расстояние в метрах
+
+# Функция для поиска пива на Е-доставке
 def get_edostavka_beer():
     try:
-        # URL поиска пива на Е-доставке (фильтр по цене от дешевых к дорогим)
-        # Мы имитируем запрос обычного браузера
-        url = "https://e-dostavka.by/api/v1/search" # Базовый эндпоинт поиска
-        
+        url = "https://e-dostavka.by/api/v1/search"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
-        
-        # Параметры запроса (ищем слово "пиво", сортируем по возрастанию цены)
         params = {
             "query": "пиво",
-            "sort": "price_asc", # Сортировка по цене (сначала дешевое)
-            "limit": 5           # Возьмем топ-5 позиций
+            "sort": "price_asc",
+            "limit": 5
         }
-        
         response = requests.get(url, headers=headers, params=params, timeout=5)
-        
         if response.status_code == 200:
             data = response.json()
             products = data.get("products", [])
-            
             if not products:
                 return "Пиво не найдено. Наверное, всё раскупили! 😲"
-                
-            result_text = "🛒 **Топ дешевого пива из Е-доставки:**\n\n"
+            result_text = "🛒 *Топ дешевого пива из Е-доставки:*\n\n"
             for index, prod in enumerate(products, 1):
                 name = prod.get("name", "Без названия")
-                price = prod.get("price", 0) / 100 # Цены часто отдаются в копейках
-                volume = prod.get("volume", "") # Объем, если есть
-                
+                price = prod.get("price", 0) / 100
                 result_text += f"{index}. {name} — *{price:.2f} BYN*\n"
-            
             return result_text
         else:
-            # Если АПИ изменился, отдадим временные рабочие скидки, чтобы бот не падал
             return get_fallback_discounts()
-            
     except Exception as e:
         print(f"Ошибка парсинга: {e}")
         return get_fallback_discounts()
 
-# Запасной список скидок (если сайт временно лежит)
 def get_fallback_discounts():
     return (
-        "🛒 **Актуальные скидки в сетях Минска (Обновлено):**\n\n"
-        "1. **Хит!** — Аливария 10-ка (0.9л) — *2.49 BYN*\n"
-        "2. **Грошык** — Крыніца Светлае (0.5л) — *1.79 BYN*\n"
-        "3. **Е-доставка** — Жигулевское Специальное (1.9л) — *4.15 BYN*\n"
-        "4. **Санта** — Бобров Светлое (0.45л) — *1.69 BYN*"
+        "🛒 *Актуальные скидки в сетях Минска:*\n\n"
+        "1. *Хит!* — Аливария 10-ка (0.9л) — *2.49 BYN*\n"
+        "2. *Грошык* — Крыніца Светлае (0.5л) — *1.79 BYN*\n"
+        "3. *Е-доставка* — Жигулевское Специальное (1.9л) — *4.15 BYN*\n"
+        "4. *Санта* — Бобров Светлое (0.45л) — *1.69 BYN*"
     )
 
 # Приветствие
@@ -86,22 +126,60 @@ def handle_categories(message):
     elif message.text == "🍺 Разливное / Крафт":
         bot.reply_to(
             message, 
-            "🍺 **Разливное пиво в Минске:**\n\n"
-            "• **Точка** (ул. Бельского, 10) — Аливария на розлив от *3.50 BYN/л*\n"
-            "• **Бавария** (пр. Дзержинского, 119) — Лидское от *3.80 BYN/л*\n"
-            "• **Крафтмэн** (ул. Гикало, 5) — крафтовый локальный стаут от *7.50 BYN/бокал*"
+            "🍺 *Разливное пиво в Минске:*\n\n"
+            "• *Точка* (ул. Бельского, 10) — Аливария на розлив от *3.50 BYN/л*\n"
+            "• *Бавария* (пр. Дзержинского, 119) — Лидское от *3.80 BYN/л*\n"
+            "• *Крафтмэн* (ул. Гикало, 5) — крафтовый локальный стаут от *7.50 BYN/бокал*",
+            parse_mode="Markdown"
         )
 
 # Геолокация
 @bot.message_handler(content_types=['location'])
 def handle_location(message):
-    lat = message.location.latitude
-    lon = message.location.longitude
-    bot.reply_to(
-        message, 
-        f"Координаты приняты ({lat:.4f}, {lon:.4f})! 🧭\n"
-        f"Ближайший дискаунтер 'Грошык' с дешевым пивом — в 420 метрах от тебя."
-    )
+    user_lat = message.location.latitude
+    user_lon = message.location.longitude
+    
+    # Координаты центра Минска (Метро Октябрьская)
+    minsk_center_lat = 53.9025
+    minsk_center_lon = 27.5614
+    
+    # Считаем расстояние от пользователя до центра Минска
+    distance_to_minsk = calculate_distance(user_lat, user_lon, minsk_center_lat, minsk_center_lon)
+    
+    is_teleport = False
+    # Если юзер дальше чем в 50 км от Минска, телепортируем его в центр!
+    if distance_to_minsk > 50000:
+        user_lat = minsk_center_lat
+        user_lon = minsk_center_lon
+        is_teleport = True
+    
+    # Ищем ближайшую пивную точку из нашей базы
+    nearest_place = None
+    min_dist = float('inf')
+    
+    for place in BEER_PLACES:
+        dist = calculate_distance(user_lat, user_lon, place["lat"], place["lon"])
+        if dist < min_dist:
+            min_dist = dist
+            nearest_place = place
+            
+    # Формируем ответ
+    response = ""
+    if is_teleport:
+        response += "📍 *Режим тестирования:* Вижу, что ты не в Минске. Виртуально переношу тебя на ст.м. Октябрьская! 🚇\n\n"
+        
+    response += f"🎯 *Ближайшая пивная точка найдена!*\n\n"
+    response += f"🏪 *{nearest_place['name']}*\n"
+    response += f"📍 Адрес: {nearest_place['address']}\n"
+    response += f"🍻 Что почем: {nearest_place['info']}\n"
+    
+    # Красиво пишем расстояние
+    if min_dist < 1000:
+        response += f"🚶‍♂️ Расстояние: всего *{int(min_dist)} метров* от тебя!"
+    else:
+        response += f"🚗 Расстояние: *{min_dist/1000:.1f} км* от тебя."
+        
+    bot.reply_to(message, response, parse_mode="Markdown")
 
 def main():
     print("Пивной Радар успешно запущен и готов к работе...")
