@@ -24,7 +24,11 @@ def webhook():
 # Пример обработки команды /start
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.send_message(message.chat.id, "Привет! Пиво-радар в Минске запущен. Чем могу помочь?")
+    markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    btn_shop = telebot.types.KeyboardButton("Выбрать магазин")
+    btn_gps = telebot.types.KeyboardButton("Отправить GPS", request_location=True)
+    markup.add(btn_shop, btn_gps)
+    bot.send_message(message.chat.id, "Привет! Пиво-радар в Минске запущен. Чем могу помочь?", reply_markup=markup)
 
 # Пример обработки любого текстового сообщения
 @bot.message_handler(func=lambda message: True)
