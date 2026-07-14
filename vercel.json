@@ -11,7 +11,6 @@
       "src": "/(.*)",
       "dest": "api/index.py"
     }
-  ],
-  "installCommand": "echo 'skipping npm install'"
+  ]
 }
  
