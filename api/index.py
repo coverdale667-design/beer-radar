@@ -24,11 +24,11 @@ def webhook():
 # Пример обработки команды /start
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "Привет! Пиво-радар в Минске запущен. Чем могу помочь?")
+    bot.send_message(message.chat.id, "Привет! Пиво-радар в Минске запущен. Чем могу помочь?")
 
 # Пример обработки любого текстового сообщения
 @bot.message_handler(func=lambda message: True)
 def echo_all(message):
-    bot.reply_to(message, f"Вы написали: {message.text}")
+    bot.send_message(message.chat.id, f"Вы написали: {message.text}")
     # тест деплоя
     
